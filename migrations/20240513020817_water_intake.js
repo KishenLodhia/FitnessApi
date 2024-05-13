@@ -3,7 +3,7 @@ exports.up = function (knex) {
     table.increments("id").primary();
     table.integer("user_id").unsigned().references("id").inTable("users").onDelete("CASCADE");
     table.timestamp("timestamp").defaultTo(knex.fn.now());
-    table.float("volume").notNullable();
+    table.float("amount").notNullable();
   });
 };
 
