@@ -266,4 +266,63 @@ router.delete("/:user_id/water_intake/:entry_id", async (req, res) => {
   }
 });
 
+// Get Pedometer Entries for User
+router.get("/:user_id/pedometer_entries", async (req, res) => {
+  const { user_id } = req.params;
+  try {
+    const entries = await db("pedometer_entries").where({ user_id });
+    res.status(200).json(entries);
+  } catch (error) {
+    console.error("Error fetching pedometer entries:", error);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// Add Pedometer Entry for User
+router.post("/:user_id/pedometer_entries", async (req, res) => {
+  const { user_id } = req.params;
+  const { date, steps, distance } = req.body;
+  try {
+    const [id] = await db("pedometer_entries").insert({ user_id, date, steps, distance });
+    const newEntry = await db("pedometer_entries").where({ id }).first();
+    res.status(201).json(newEntry);
+  } catch (error) {
+    console.error("Error adding pedometer entry:", error);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// Update Pedometer Entry for User
+router.put("/:user_id/pedometer_entries/:entry_id", async (req, res) => {
+  const { user_id, entry_id } = req.params;
+  const { date, steps, distance } = req.body;
+  try {
+    const count = await db("pedometer_entries").where({ id: entry_id, user_id }).update({ date, steps, distance });
+    if (count > 0) {
+      const updatedEntry = await db("pedometer_entries").where({ id: entry_id }).first();
+      res.status(200).json(updatedEntry);
+    } else {
+      res.status(404).json({ message: "The pedometer entry could not be found" });
+    }
+  } catch (error) {
+    console.error("Error updating pedometer entry:", error);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// Delete Pedometer Entry for User
+router.delete("/:user_id/pedometer_entries/:entry_id", async (req, res) => {
+  const { user_id, entry_id } = req.params;
+  try {
+    const count = await db("pedometer_entries").where({ id: entry_id, user_id }).del();
+    if (count > 0) {
+      res.status(200).json({ message: "The pedometer entry has been deleted" });
+    } else {
+      res.status(404).json({ message: "The pedometer entry could not be found" });
+    }
+  } catch (error) {
+    console.error("Error deleting pedometer entry:", error);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
 module.exports = router;
