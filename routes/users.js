@@ -2,29 +2,104 @@ const express = require("express");
 const router = express.Router();
 const knex = require("knex");
 const config = require("../knexfile");
+const bcrypt = require("bcrypt");
 const { check, validationResult } = require("express-validator");
-
+const jwt = require("jsonwebtoken");
 const db = knex(config.development);
+require("dotenv").config();
+
+function sendErrorMessage(res, statusCode, message) {
+  res.status(statusCode).json({
+    error: true,
+    message: message,
+  });
+}
+
+const authorize = (req, res, next) => {
+  const authorization = req.headers.authorization;
+  let token = null;
+
+  if (authorization && authorization.split(" ").length === 2) {
+    token = authorization.split(" ")[1];
+  } else {
+    sendErrorMessage(res, 401, "Unauthorized: Token not present");
+    return;
+  }
+
+  try {
+    const decoded = jwt.verify(token, process.env.SECRET_KEY);
+    if (decoded.exp < Date.now() / 1000) {
+      sendErrorMessage(res, 401, "Unauthorized: Token has expired");
+      return;
+    }
+    next();
+  } catch (error) {
+    sendErrorMessage(res, 401, "Unauthorized: Token is not valid");
+  }
+};
+
+router.post("/login", async (req, res) => {
+  const email = req.body.email;
+  const password = req.body.password;
+  if (!email || !password) {
+    sendErrorMessage(res, 400, "Request body is incomplete - Email and Password required");
+  }
+
+  const queryUsers = await db.from("users").select("*").where("email", "=", email);
+  if (queryUsers.length === 0) {
+    console.log("user does not exist");
+    sendErrorMessage(res, 404, "User not found");
+  }
+
+  const user = queryUsers[0];
+  const match = bcrypt.compare(password, user.hash);
+  if (!match) {
+    sendErrorMessage(res, 401, "Incorrect password");
+  }
+
+  const secretKey = process.env.SECRET_KEY;
+  const expiresIn = 60 * 60 * 24 * 7;
+  const exp = Date.now();
+  const token = jwt.sign({ email, exp }, secretKey);
+  res.json({ token_type: "Bearer", token, expiresIn });
+});
+
+router.post("/register", async (req, res) => {
+  const email = req.body.email;
+  const password = req.body.password;
+  if (!email || !password) {
+    sendErrorMessage(res, 404, "Request body is incomplete - Email and Password required");
+  }
+  // check if user exists
+  const queryUsers = await db("users").select("*").where("email", "=", email);
+  if (queryUsers.length > 0) {
+    sendErrorMessage(res, 404, "User already exists");
+  }
+
+  // insert user into DB
+  const saltRounds = 10;
+  const hash = bcrypt.hashSync(password, saltRounds);
+  await db.from("users").insert({ email, hash });
+  res.status(201).json({ success: true, message: "User created" });
+});
 
 // get all mood entries for a user
-router.get("/:user_id", async (req, res) => {
+router.get("/:user_id", authorize, async (req, res) => {
   const { user_id } = req.params;
   try {
     const entries = await db("users")
-      .select("id", "username", "email", "name", "age", "height", "weight", "fitness_goal")
+      .select("id", "email", "name", "age", "height", "weight", "fitness_goal")
       .where("id", user_id);
     res.json(entries);
   } catch (error) {
-    console.error("Error fetching mood entries:", error);
-    res.status(500).json({ error: "Internal server error" });
+    sendErrorMessage(res, 500, "Internal server error");
   }
 });
 
-// add a new user
+// add a new userc
 router.post(
   "/",
   [
-    check("username").isLength({ min: 3 }).withMessage("Username must be at least 3 characters long"),
     check("password").isLength({ min: 6 }).withMessage("Password must be at least 6 characters long"),
     check("email").isEmail().withMessage("Email is not valid"),
     check("name").not().isEmpty().withMessage("Name is required"),
@@ -43,18 +118,14 @@ router.post(
     if (!errors.isEmpty()) {
       return res.status(400).json({ errors: errors.array() });
     }
-    const { username, password, email, name, age, height, weight, fitness_goal } = req.body;
+    const { password, email, name, age, height, weight, fitness_goal } = req.body;
     try {
-      const existingUser = await db("users").where({ username }).orWhere({ email }).first();
-      if (existingUser.username === username) {
-        return res.status(400).json({ error: "Username already exists" });
-      }
+      const existingUser = await db("users").where({ email }).first();
       if (existingUser.email === email) {
-        return res.status(400).json({ error: "Email already exists" });
+        sendErrorMessage(res, 400, "Email already exists");
       }
 
       const [id] = await db("users").insert({
-        username,
         password,
         email,
         name,
@@ -66,8 +137,7 @@ router.post(
       const newUser = await db("users").where({ id }).first();
       res.status(201).json(newUser);
     } catch (error) {
-      console.error("Error adding new user:", error);
-      res.status(500).json({ error: "Internal server error", message: error.message });
+      sendErrorMessage(res, 500, "Internal server error");
     }
   }
 );
@@ -76,7 +146,6 @@ router.post(
 router.put(
   "/:user_id",
   [
-    check("username").notEmpty().withMessage("Username is required"),
     check("password").notEmpty().withMessage("Password is required"),
     check("email").isEmail().withMessage("Email is not valid"),
     check("name").notEmpty().withMessage("Name is required"),
@@ -91,24 +160,16 @@ router.put(
     }
 
     const { user_id } = req.params;
-    const { username, password, email, name, age, height, weight, fitness_goal } = req.body;
+    const { password, email, name, age, height, weight, fitness_goal } = req.body;
     try {
-      const existingUser = await db("users")
-        .where("id", "<>", user_id)
-        .andWhere({ username })
-        .orWhere({ email })
-        .first();
+      const existingUser = await db("users").where("id", "<>", user_id).orWhere({ email }).first();
       if (existingUser) {
-        if (existingUser.username === username) {
-          return res.status(400).json({ error: "Username already exists" });
-        }
         if (existingUser.email === email) {
           return res.status(400).json({ error: "Email already exists" });
         }
       }
 
       const count = await db("users").where({ id: user_id }).update({
-        username,
         password,
         email,
         name,

@@ -1,0 +1,4 @@
+::ffff:127.0.0.1 - - [16/May/2024:15:28:53 +0000] "GET /users/1 HTTP/1.1" 401 58
+[0mGET /users/1 [33m401 [0m3.262 ms - 58[0m
+::ffff:127.0.0.1 - - [16/May/2024:15:29:30 +0000] "GET /users/1 HTTP/1.1" 401 58 "-" "Thunder Client (https://www.thunderclient.com)"
+::ffff:127.0.0.1 - - [16/May/2024:15:29:56 +0000] "GET /users/1 HTTP/1.1" 200 119 "-" "Thunder Client (https://www.thunderclient.com)"
