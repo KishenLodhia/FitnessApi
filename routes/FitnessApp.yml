@@ -1,0 +1,438 @@
+openapi: 3.0.0
+info:
+  title: User Management API
+  version: 1.0.0
+  description: API for managing users, moods, water intake, and pedometer entries.
+servers:
+  - url: http://localhost:3000
+paths:
+  /login:
+    post:
+      summary: User login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+                - password
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: user@example.com
+                password:
+                  type: string
+                  example: password123
+      responses:
+        "200":
+          description: Successful login
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token_type:
+                    type: string
+                    example: Bearer
+                  token:
+                    type: string
+                  expiresIn:
+                    type: integer
+        "400":
+          description: Bad request
+        "401":
+          description: Unauthorized
+        "404":
+          description: User not found
+  /register:
+    post:
+      summary: User registration
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+                - password
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: user@example.com
+                password:
+                  type: string
+                  example: password123
+      responses:
+        "201":
+          description: User created
+        "400":
+          description: Bad request
+  /{user_id}:
+    get:
+      summary: Get user details
+      parameters:
+        - name: user_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Successful response
+        "401":
+          description: Unauthorized
+        "500":
+          description: Internal server error
+  /{user_id}/moods:
+    get:
+      summary: Get mood entries
+      parameters:
+        - name: user_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Successful response
+        "403":
+          description: Forbidden
+        "500":
+          description: Internal server error
+    post:
+      summary: Add mood entry
+      parameters:
+        - name: user_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - mood
+              properties:
+                mood:
+                  type: string
+                  example: Happy
+                notes:
+                  type: string
+                  example: Had a great day!
+      responses:
+        "201":
+          description: Mood entry created
+        "400":
+          description: Bad request
+        "403":
+          description: Forbidden
+        "500":
+          description: Internal server error
+  /{user_id}/moods/{entry_id}:
+    put:
+      summary: Update mood entry
+      parameters:
+        - name: user_id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: entry_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - mood
+              properties:
+                mood:
+                  type: string
+                notes:
+                  type: string
+      responses:
+        "200":
+          description: Mood entry updated
+        "400":
+          description: Bad request
+        "403":
+          description: Forbidden
+        "404":
+          description: Mood entry not found
+        "500":
+          description: Internal server error
+    delete:
+      summary: Delete mood entry
+      parameters:
+        - name: user_id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: entry_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Mood entry deleted
+        "403":
+          description: Forbidden
+        "404":
+          description: Mood entry not found
+        "500":
+          description: Internal server error
+  /{user_id}/water_intake:
+    get:
+      summary: Get water intake entries
+      parameters:
+        - name: user_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Successful response
+        "403":
+          description: Forbidden
+        "500":
+          description: Internal server error
+    post:
+      summary: Add water intake entry
+      parameters:
+        - name: user_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - amount
+                - timestamp
+              properties:
+                amount:
+                  type: number
+                  example: 500
+                timestamp:
+                  type: string
+                  format: date-time
+                  example: "2024-05-22T12:00:00Z"
+      responses:
+        "201":
+          description: Water intake entry created
+        "400":
+          description: Bad request
+        "403":
+          description: Forbidden
+        "500":
+          description: Internal server error
+  /{user_id}/water_intake/{entry_id}:
+    put:
+      summary: Update water intake entry
+      parameters:
+        - name: user_id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: entry_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - amount
+                - timestamp
+              properties:
+                amount:
+                  type: number
+                timestamp:
+                  type: string
+                  format: date-time
+      responses:
+        "200":
+          description: Water intake entry updated
+        "400":
+          description: Bad request
+        "403":
+          description: Forbidden
+        "404":
+          description: Water intake entry not found
+        "500":
+          description: Internal server error
+    delete:
+      summary: Delete water intake entry
+      parameters:
+        - name: user_id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: entry_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Water intake entry deleted
+        "403":
+          description: Forbidden
+        "404":
+          description: Water intake entry not found
+        "500":
+          description: Internal server error
+  /{user_id}/pedometer_entries:
+    get:
+      summary: Get pedometer entries
+      parameters:
+        - name: user_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Successful response
+        "403":
+          description: Forbidden
+        "500":
+          description: Internal server error
+    post:
+      summary: Add pedometer entry
+      parameters:
+        - name: user_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - date
+                - steps
+                - distance
+              properties:
+                date:
+                  type: string
+                  format: date-time
+                  example: "2024-05-22"
+                steps:
+                  type: integer
+                  example: 10000
+                distance:
+                  type: number
+                  example: 8.5
+      responses:
+        "201":
+          description: Pedometer entry created
+        "400":
+          description: Bad request
+        "403":
+          description: Forbidden
+        "500":
+          description: Internal server error
+  /{user_id}/pedometer_entries/{entry_id}:
+    put:
+      summary: Update pedometer entry
+      parameters:
+        - name: user_id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: entry_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - date
+                - steps
+                - distance
+              properties:
+                date:
+                  type: string
+                  format: date-time
+                  example: "2024-05-22"
+                steps:
+                  type: integer
+                distance:
+                  type: number
+      responses:
+        "200":
+          description: Pedometer entry updated
+        "400":
+          description: Bad request
+        "403":
+          description: Forbidden
+        "404":
+          description: Pedometer entry not found
+        "500":
+          description: Internal server error
+    delete:
+      summary: Delete pedometer entry
+      parameters:
+        - name: user_id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: entry_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Pedometer entry deleted
+        "403":
+          description: Forbidden
+        "404":
+          description: Pedometer entry not found
+        "500":
+          description: Internal server error
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+security:
+  - bearerAuth: []
