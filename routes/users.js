@@ -6,6 +6,7 @@ const bcrypt = require("bcrypt");
 const { check, validationResult } = require("express-validator");
 const jwt = require("jsonwebtoken");
 const db = knex(config.development);
+const moment = require("moment");
 require("dotenv").config();
 
 function sendErrorMessage(res, statusCode, message) {
@@ -58,7 +59,7 @@ router.post("/login", async (req, res) => {
   const expiresIn = 60 * 60 * 24 * 7;
   const exp = Math.floor(Date.now() / 1000) + expiresIn;
   const token = jwt.sign({ id: user.id, email, exp }, secretKey);
-  res.json({ token_type: "Bearer", token, expiresIn });
+  res.json({ token_type: "Bearer", token, expiresIn, user_id: user.id });
 });
 
 router.post(
@@ -304,7 +305,11 @@ router.get("/:user_id/water_intake", authorize, async (req, res) => {
   }
 
   try {
-    const entries = await db("water_intake").where({ user_id });
+    const sevenDaysAgo = moment().subtract(7, "days").format("YYYY-MM-DD");
+    const entries = await db("water_intake")
+      .where({ user_id })
+      .andWhere("timestamp", ">=", sevenDaysAgo)
+      .orderBy("timestamp", "desc");
     res.status(200).json(entries);
   } catch (error) {
     return sendErrorMessage(res, 500, "Internal server error");
@@ -322,6 +327,7 @@ router.post(
     const { user_id } = req.params;
     const { amount, timestamp } = req.body;
     const errors = validationResult(req);
+    const mysqlTimestamp = new Date(timestamp).toISOString().replace("T", " ").split(".")[0];
 
     if (req.user.id !== parseInt(user_id)) {
       return sendErrorMessage(res, 403, "Forbidden: You can only access your account");
@@ -332,10 +338,24 @@ router.post(
     }
 
     try {
-      const [id] = await db("water_intake").insert({ user_id, amount, timestamp });
-      const newEntry = await db("water_intake").where({ id }).first();
-      res.status(201).json(newEntry);
+      // Check if there's already an entry for the same day
+      const existingEntry = await db("water_intake").where({ user_id, timestamp: mysqlTimestamp }).first();
+
+      if (existingEntry) {
+        // Update existing entry
+        await db("water_intake").where({ id: existingEntry.id }).update({ amount, timestamp: mysqlTimestamp });
+
+        // Fetch updated entry
+        const updatedEntry = await db("water_intake").where({ id: existingEntry.id }).first();
+        res.status(200).json(updatedEntry);
+      } else {
+        // Insert new entry
+        const [id] = await db("water_intake").insert({ user_id, amount, timestamp: mysqlTimestamp });
+        const newEntry = await db("water_intake").where({ id }).first();
+        res.status(201).json(newEntry);
+      }
     } catch (error) {
+      console.error(error.message);
       return sendErrorMessage(res, 500, "Internal server error");
     }
   }
@@ -402,10 +422,15 @@ router.get("/:user_id/pedometer_entries", authorize, async (req, res) => {
   }
 
   try {
-    const entries = await db("pedometer_entries").where({ user_id });
+    const sevenDaysAgo = moment().subtract(7, "days").format("YYYY-MM-DD");
+    const entries = await db("pedometer_entries")
+      .where({ user_id })
+      .andWhere("date", ">=", sevenDaysAgo)
+      .orderBy("date", "desc");
+
     res.status(200).json(entries);
   } catch (error) {
-    return sendErrorMessage(res, 500, "Internal server error");
+    return sendErrorMessage(res, 500, `Internal server error: ${error.message}`);
   }
 });
 
@@ -427,11 +452,27 @@ router.post(
     }
 
     try {
-      const [id] = await db("pedometer_entries").insert({ user_id, date, steps, distance });
-      const newEntry = await db("pedometer_entries").where({ id }).first();
-      res.status(201).json(newEntry);
+      const dateOnly = moment(date).format("YYYY-MM-DD");
+      const existingEntry = await db("pedometer_entries")
+        .where({ user_id })
+        .andWhere(db.raw("DATE(date) = ?", [dateOnly]))
+        .first();
+
+      if (existingEntry) {
+        // Update existing entry
+        await db("pedometer_entries")
+          .where({ id: existingEntry.id })
+          .update({ steps, distance, updated_at: new Date() });
+        const updatedEntry = await db("pedometer_entries").where({ id: existingEntry.id }).first();
+        return res.status(200).json(updatedEntry);
+      } else {
+        // Insert new entry
+        const [id] = await db("pedometer_entries").insert({ user_id, date, steps, distance }).returning("id");
+        const newEntry = await db("pedometer_entries").where({ id }).first();
+        return res.status(201).json(newEntry);
+      }
     } catch (error) {
-      return sendErrorMessage(res, 500, "Internal server error");
+      return sendErrorMessage(res, 500, `Internal server error: ${error.message}`);
     }
   }
 );
